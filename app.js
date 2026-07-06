@@ -27,19 +27,24 @@
     stepClocks:  {},
     globalClock: 100,
     costMult:    1,
-    resources:   {},  // item → available rate (both plan-required and manually added)
+    resources:   {},
   };
   if (!state.stepClocks)  state.stepClocks  = {};
   if (!state.globalClock) state.globalClock = state.clock || 100;
-  if (!state.costMult)    state.costMult    = 1;
   if (!state.resources)   state.resources   = {};
+  // Always reset costMult to 1 on load — wiki-standard recipes by default
+  state.costMult = 1;
 
   function saveState() {
-    try { localStorage.setItem("anton-v3", JSON.stringify(state)); } catch(_) {}
+    try { localStorage.setItem("anton-v4", JSON.stringify(state)); } catch(_) {}
   }
   function loadState() {
     try {
-      const s = JSON.parse(localStorage.getItem("anton-v3") || localStorage.getItem("anton-planner-v2"));
+      // Migrate from older keys, preserve targets/recipes/clocks but not costMult
+      const raw = localStorage.getItem("anton-v4")
+                || localStorage.getItem("anton-v3")
+                || localStorage.getItem("anton-planner-v2");
+      const s = JSON.parse(raw);
       if (s && Array.isArray(s.targets)) return s;
     } catch(_) {}
     return null;
