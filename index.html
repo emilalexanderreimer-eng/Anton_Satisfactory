@@ -15,14 +15,13 @@
 <main>
   <section class="panel" id="settings-panel">
     <h2>Einstellungen</h2>
-    <label class="modifier-toggle">
-      <input type="checkbox" id="modifier-025">
-      <span><strong>0,25-Modifikator</strong> — alle Rezepte laufen mit 25&nbsp;% Taktung (Update 1.2)</span>
-    </label>
-    <div class="modifier-custom">
-      <label for="clock-input">Taktung aller Maschinen:</label>
-      <input type="number" id="clock-input" min="1" max="250" step="1" value="100"> %
+    <div class="settings-row">
+      <label class="mod-label">Globale Taktung:</label>
+      <input type="number" id="clock-global" min="1" max="250" step="1" value="100"> %
+      <button id="apply-all" class="btn btn-sm">Auf alle anwenden</button>
+      <button id="apply-025" class="btn btn-sm btn-alt">0,25 auf alle (25&nbsp;%)</button>
     </div>
+    <p class="hint">Tipp: Setze pro Maschine eine eigene Taktung in der Ergebnistabelle unten.</p>
   </section>
 
   <section class="panel" id="targets-panel">
@@ -34,19 +33,35 @@
   <section class="panel" id="results-panel">
     <h2>Ergebnis</h2>
     <div id="summary"></div>
+
     <h3>Produktionsschritte</h3>
-    <div id="steps"></div>
-    <h3>Rohstoffe</h3>
-    <div id="raws"></div>
-    <h3>Nebenprodukte</h3>
-    <div id="byproducts"></div>
-    <h3>Produktionsbaum</h3>
-    <div id="tree"></div>
+    <div class="table-wrap" id="steps"></div>
+
+    <div class="two-col">
+      <div>
+        <h3>Rohstoffe</h3>
+        <div id="raws"></div>
+      </div>
+      <div>
+        <h3>Nebenprodukte</h3>
+        <div id="byproducts"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="flow-panel">
+    <div class="flow-header">
+      <h2>Produktionsfluss</h2>
+      <button id="flow-reset" class="btn btn-sm">⟳ Reset Ansicht</button>
+    </div>
+    <div id="flowchart-wrap">
+      <svg id="flowchart"></svg>
+    </div>
   </section>
 </main>
 
 <footer>
-  <p>Daten: Community-Datensatz (SatisfactoryTools) · Kein offizielles Produkt von Coffee Stain Studios</p>
+  <p>Daten: Community-Datensatz (SatisfactoryTools) · Icons: Satisfactory Wiki · Kein offizielles Produkt von Coffee Stain Studios</p>
 </footer>
 
 <script src="data.js"></script>

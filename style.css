@@ -9,6 +9,9 @@
   --accent2: #5f668c;
   --good: #6fcf7c;
   --warn: #f2c94c;
+  --raw-col: #f2c94c;
+  --prod-col: #6fcf7c;
+  --liq-col: #56cfe1;
 }
 
 * { box-sizing: border-box; }
@@ -25,12 +28,11 @@ header {
   border-bottom: 2px solid var(--accent);
   padding: 18px 28px;
 }
-
 header h1 { margin: 0; font-size: 1.5rem; }
 .subtitle { margin: 4px 0 0; color: var(--muted); font-size: 0.9rem; }
 
 main {
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
   display: flex;
@@ -44,43 +46,46 @@ main {
   border-radius: 10px;
   padding: 16px 20px;
 }
-
-.panel h2 {
-  margin: 0 0 12px;
-  font-size: 1.1rem;
-  color: var(--accent);
-}
-
+.panel h2 { margin: 0 0 12px; font-size: 1.1rem; color: var(--accent); }
 .panel h3 { margin: 18px 0 8px; font-size: 1rem; color: var(--warn); }
 
-.modifier-toggle {
+/* Settings */
+.settings-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--panel2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 14px;
-  cursor: pointer;
+  flex-wrap: wrap;
 }
+.mod-label { color: var(--muted); font-size: 0.9rem; }
+.hint { margin: 8px 0 0; color: var(--muted); font-size: 0.82rem; }
 
-.modifier-toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
-
-.modifier-custom {
-  margin-top: 10px;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.modifier-custom input {
-  width: 70px;
-  background: var(--panel2);
-  border: 1px solid var(--border);
-  color: var(--text);
+/* Buttons */
+.btn {
+  background: var(--accent);
+  color: #1a1208;
+  border: none;
   border-radius: 6px;
-  padding: 4px 8px;
+  padding: 8px 14px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
 }
+.btn:hover { filter: brightness(1.12); }
+.btn-sm { padding: 5px 10px; font-size: 0.82rem; }
+.btn-alt { background: var(--accent2); color: var(--text); }
+.btn-remove {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.btn-remove:hover { color: #ff7b7b; border-color: #ff7b7b; }
 
+/* Targets */
 .target-row {
   display: flex;
   gap: 10px;
@@ -88,7 +93,6 @@ main {
   margin-bottom: 8px;
   flex-wrap: wrap;
 }
-
 select, input[type="number"] {
   background: var(--panel2);
   border: 1px solid var(--border);
@@ -97,87 +101,116 @@ select, input[type="number"] {
   padding: 6px 8px;
   font-size: 0.9rem;
 }
+.item-select { min-width: 240px; }
 
-.target-row select.item-select { min-width: 240px; }
-.target-row input { width: 90px; }
-
-.btn {
-  background: var(--accent);
-  color: #1a1208;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 14px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.btn:hover { filter: brightness(1.1); }
-
-.btn-remove {
-  background: transparent;
-  color: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 6px 10px;
-  cursor: pointer;
-}
-
-.btn-remove:hover { color: #ff7b7b; border-color: #ff7b7b; }
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-}
-
-th, td {
-  text-align: left;
-  padding: 7px 10px;
-  border-bottom: 1px solid var(--border);
-}
-
-th { color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; }
-
-td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-
-.recipe-select { max-width: 280px; }
-
+/* Summary */
 .summary-cards {
   display: flex;
   gap: 14px;
   flex-wrap: wrap;
+  margin-bottom: 8px;
 }
-
 .card {
   background: var(--panel2);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 16px;
-  min-width: 140px;
+  min-width: 130px;
 }
+.card .label { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: .04em; }
+.card .value { font-size: 1.25rem; font-weight: 700; color: var(--good); }
 
-.card .label { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; }
-.card .value { font-size: 1.3rem; font-weight: 700; color: var(--good); }
+/* Table */
+.table-wrap { overflow-x: auto; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  min-width: 680px;
+}
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: .04em; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-.tree ul { list-style: none; padding-left: 22px; margin: 4px 0; border-left: 1px dashed var(--border); }
-.tree > ul { border-left: none; padding-left: 0; }
-.tree li { padding: 3px 0; }
+/* Clock input in table */
+.clock-cell { white-space: nowrap; }
+.clock-cell input { width: 62px; }
 
-.tree .t-item { font-weight: 600; }
-.tree .t-rate { color: var(--good); }
-.tree .t-machine { color: var(--muted); font-size: 0.85rem; }
-.tree .t-raw { color: var(--warn); }
-.tree .t-cycle { color: #ff7b7b; font-size: 0.8rem; }
+/* Ingredient pills */
+.ingr-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+.ingr-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 3px 8px 3px 4px;
+  font-size: 0.78rem;
+  color: var(--text);
+}
+.ingr-pill img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  border-radius: 4px;
+  background: #1a1d23;
+}
+.ingr-pill .pill-fallback {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.ingr-pill .pill-rate { color: var(--good); font-weight: 600; }
+.ingr-pill .pill-rate.liq { color: var(--liq-col); }
+
+/* Recipe select */
+.recipe-select { max-width: 220px; font-size: 0.85rem; }
+
+/* Two-col layout */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 4px; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+/* Small table for raws/byproducts */
+.small-table { font-size: 0.85rem; }
+.small-table td { padding: 5px 8px; }
+
+/* Flowchart */
+#flow-panel { padding: 16px 16px 0; }
+.flow-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.flow-header h2 { margin: 0; font-size: 1.1rem; color: var(--accent); }
+
+#flowchart-wrap {
+  width: 100%;
+  height: 520px;
+  background: #161920;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: grab;
+  position: relative;
+  user-select: none;
+}
+#flowchart-wrap:active { cursor: grabbing; }
+#flowchart { width: 100%; height: 100%; }
 
 .muted { color: var(--muted); }
+.warn { color: var(--warn); }
 
 footer {
   text-align: center;
   color: var(--muted);
   font-size: 0.8rem;
   padding: 20px;
-}
-
-@media (max-width: 640px) {
-  .target-row select.item-select { min-width: 100%; }
 }
