@@ -15,6 +15,7 @@
     for (const [item] of r.out)
       (recipesByProduct[item] = recipesByProduct[item] || []).push(r);
   }
+  const allItems = Object.keys(ITEMS).sort((a, b) => ITEMS[a].name.localeCompare(ITEMS[b].name));
   const producibleItems = Object.keys(recipesByProduct)
     .filter(c => ITEMS[c])
     .sort((a, b) => ITEMS[a].name.localeCompare(ITEMS[b].name));
@@ -26,7 +27,7 @@
     stepClocks:  {},
     globalClock: 100,
     costMult:    1,
-    resources:   {},
+    resources:   {},  // item → available rate (both plan-required and manually added)
   };
   if (!state.stepClocks)  state.stepClocks  = {};
   if (!state.globalClock) state.globalClock = state.clock || 100;
@@ -56,7 +57,7 @@
     return String(s).replace(/[&<>"]/g, ch => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[ch]));
   }
   function hexCol(item) {
-    if (isLiq(item))              return "#56cfe1";
+    if (isLiq(item))                    return "#56cfe1";
     if (ITEMS[item] && ITEMS[item].raw) return "#f2c94c";
     return "#6fcf7c";
   }
@@ -70,6 +71,7 @@
       encodeURIComponent(it.name.replace(/ /g, "_")) + ".png";
   }
   function trunc(s, n) { return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+  function sid(id) { return "fc_" + id.replace(/[^a-zA-Z0-9]/g, "_"); }
 
   // ── recipe helpers ─────────────────────────────────────────────────────────
   function defaultRecipeFor(item) {
@@ -97,7 +99,6 @@
   function solve(targets) {
     const demand = new Map(), steps = new Map(), raws = new Map(), surplus = new Map();
     const queue = [];
-
     function addDemand(item, rate) {
       if (rate <= 1e-9) return;
       const s = surplus.get(item) || 0;
@@ -110,7 +111,6 @@
       demand.set(item, (demand.get(item) || 0) + rate);
       queue.push(item);
     }
-
     for (const t of targets) if (t.item && t.rate > 0) addDemand(t.item, t.rate);
 
     let guard = 0;
@@ -119,25 +119,20 @@
       const rate = demand.get(item) || 0;
       if (rate <= 1e-9) continue;
       demand.set(item, 0);
-
       if (isRaw(item)) { raws.set(item, (raws.get(item) || 0) + rate); continue; }
       const rec = chosenRecipeFor(item);
       if (!rec) { raws.set(item, (raws.get(item) || 0) + rate); continue; }
-
       const cf   = clockFor(rec.id);
       const prod = rec.out.find(([i]) => i === item);
       const mach = rate / ((prod[1] * 60 / rec.time) * cf);
-
       const st = steps.get(rec.id) || { recipe: rec, machines: 0 };
       st.machines += mach;
       steps.set(rec.id, st);
-
       for (const [oItem, oAmt] of rec.out) {
         if (oItem === item) continue;
         surplus.set(oItem, (surplus.get(oItem) || 0) + (oAmt * 60 / rec.time) * cf * mach);
       }
       for (const [iItem, iAmt] of rec.in)
-        // costMult scales ingredient amounts only — output and machine count are unaffected
         addDemand(iItem, (iAmt * 60 / rec.time) * cf * mach * state.costMult);
     }
 
@@ -155,9 +150,9 @@
   const elAdd       = document.getElementById("add-target");
   const elGlobalCk  = document.getElementById("clock-global");
   const elApplyAll  = document.getElementById("apply-all");
-  const elApply025  = document.getElementById("apply-025");
   const elCostMult  = document.getElementById("cost-mult");
   const elResInputs = document.getElementById("resource-inputs");
+  const elBtnAddRes = document.getElementById("btn-add-resource");
   const elBtnCalc   = document.getElementById("btn-calc-max");
   const elBtnClear  = document.getElementById("btn-clear-res");
   const elResResult = document.getElementById("resource-result");
@@ -185,13 +180,13 @@
         `<select class="item-select">${itemOptions(t.item)}</select>` +
         `<input type="number" min="0" step="any" value="${t.rate}">` +
         `<span class="muted">/min</span><button class="btn-remove">✕</button>`;
-      row.querySelector("select").addEventListener("change", e => { t.item = e.target.value; update(); });
+      row.querySelector("select").addEventListener("change", e => { t.item = e.target.value; fcCustomPos = {}; update(); });
       row.querySelector("input").addEventListener("input", e => { t.rate = parseFloat(e.target.value) || 0; update(); });
-      row.querySelector(".btn-remove").addEventListener("click", () => { state.targets.splice(idx, 1); renderTargets(); update(); });
+      row.querySelector(".btn-remove").addEventListener("click", () => { state.targets.splice(idx, 1); renderTargets(); fcCustomPos = {}; update(); });
       elTargets.appendChild(row);
     });
   }
-  elAdd.addEventListener("click", () => { state.targets.push({ item: producibleItems[0], rate: 10 }); renderTargets(); update(); });
+  elAdd.addEventListener("click", () => { state.targets.push({ item: producibleItems[0], rate: 10 }); renderTargets(); fcCustomPos = {}; update(); });
 
   // ── Settings UI ────────────────────────────────────────────────────────────
   elGlobalCk.value = state.globalClock;
@@ -203,8 +198,6 @@
     const v = parseFloat(elGlobalCk.value);
     if (v >= 1 && v <= 250) { state.stepClocks = {}; state.globalClock = v; update(); }
   });
-
-  // Cost multiplier (Update 1.2 Game Mode)
   elCostMult.value = String(state.costMult);
   elCostMult.addEventListener("change", () => {
     state.costMult = parseFloat(elCostMult.value) || 1;
@@ -262,7 +255,7 @@
     html += "</table>";
     elSteps.innerHTML = html;
     elSteps.querySelectorAll(".recipe-select").forEach(s => {
-      s.addEventListener("change", () => { state.recipeChoice[s.dataset.item] = s.value; update(); });
+      s.addEventListener("change", () => { state.recipeChoice[s.dataset.item] = s.value; fcCustomPos = {}; update(); });
     });
     elSteps.querySelectorAll(".step-clock").forEach(inp => {
       inp.addEventListener("input", () => {
@@ -272,18 +265,16 @@
     });
   }
 
-  // ── Raw/byproduct tables ───────────────────────────────────────────────────
+  // ── Map tables ─────────────────────────────────────────────────────────────
   function renderMap(el, map, emptyText) {
     const entries = [...map.entries()].filter(([, v]) => v > 1e-6).sort((a, b) => b[1] - a[1]);
     if (!entries.length) { el.innerHTML = `<p class="muted">${emptyText}</p>`; return; }
     let html = `<table class="small-table"><tr><th>Item</th><th class="num">Menge</th></tr>`;
     for (const [item, rate] of entries)
-      html += `<tr><td>
-        <span style="display:inline-flex;align-items:center;gap:5px">
-          <img src="${esc(wikiUrl(item))}" alt="" loading="lazy" width="18" height="18"
-            style="object-fit:contain;vertical-align:middle" onerror="this.style.display='none'">
-          ${esc(itemName(item))}
-        </span></td>
+      html += `<tr><td><span style="display:inline-flex;align-items:center;gap:5px">
+        <img src="${esc(wikiUrl(item))}" alt="" loading="lazy" width="18" height="18"
+          style="object-fit:contain;vertical-align:middle" onerror="this.style.display='none'">
+        ${esc(itemName(item))}</span></td>
         <td class="num" style="color:${hexCol(item)}">${fmt(rate)}${unit(item)}</td></tr>`;
     el.innerHTML = html + "</table>";
   }
@@ -291,7 +282,7 @@
   // ── Summary ────────────────────────────────────────────────────────────────
   function renderSummary(result) {
     const machines = [...result.steps.values()].reduce((a, s) => a + Math.ceil(s.machines - 1e-9), 0);
-    const multLabel = state.costMult !== 1
+    const multCard = state.costMult !== 1
       ? `<div class="card"><div class="label">Rezeptkosten-Mult.</div><div class="value" style="color:var(--warn)">${fmt(state.costMult, 2)}×</div></div>`
       : "";
     elSummary.innerHTML =
@@ -299,31 +290,45 @@
         <div class="card"><div class="label">Maschinen gesamt</div><div class="value">${machines}</div></div>
         <div class="card"><div class="label">Leistung gesamt</div><div class="value">${fmt(result.power, 1)} MW</div></div>
         <div class="card"><div class="label">Produktionsschritte</div><div class="value">${result.steps.size}</div></div>
-        ${multLabel}
+        ${multCard}
       </div>` +
       (result.unstable ? '<p class="warn">⚠ Möglicher Rezeptzyklus erkannt.</p>' : "");
   }
 
-  // ── Resource calculator ────────────────────────────────────────────────────
+  // ── Resource panel ─────────────────────────────────────────────────────────
   function renderResourceInputs(result) {
-    if (!result.raws.size) {
-      elResInputs.innerHTML = '<p class="muted">Keine Rohstoffe benötigt.</p>';
+    // Collect all items to show: union of plan-required raws + manually set resources
+    const planRaws = new Map(result.raws);
+    const allResItems = new Set([...planRaws.keys(), ...Object.keys(state.resources)]);
+
+    if (!allResItems.size) {
+      elResInputs.innerHTML = '<p class="muted">Keine Rohstoffe vorhanden.</p>';
       return;
     }
-    const entries = [...result.raws.entries()].sort((a, b) => b[1] - a[1]);
+
+    const entries = [...allResItems].sort((a, b) => {
+      // Plan-required first, then manual-only
+      const ap = planRaws.has(a) ? 0 : 1, bp = planRaws.has(b) ? 0 : 1;
+      if (ap !== bp) return ap - bp;
+      return itemName(a).localeCompare(itemName(b));
+    });
+
     let html = '<div class="resource-grid">';
-    for (const [item, needed] of entries) {
-      const col  = hexCol(item);
-      const avail = state.resources[item];
-      const ab   = abbr(itemName(item));
-      html += `<div class="resource-row">
-        <img src="${esc(wikiUrl(item))}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-        <span class="r-icon" style="display:none;background:${col}22;color:${col};border:1px solid ${col}">${esc(ab)}</span>
-        <span class="r-name">${esc(itemName(item))}</span>
-        <span class="r-needed">benötigt: ${fmt(needed)}${unit(item)}</span>
+    for (const item of entries) {
+      const needed = planRaws.get(item) || 0;
+      const avail  = state.resources[item];
+      const col    = hexCol(item);
+      const manualOnly = !planRaws.has(item);
+      html += `<div class="resource-row${manualOnly ? " manual-row" : ""}">
+        <img src="${esc(wikiUrl(item))}" alt="" loading="lazy"
+          onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <span class="r-icon" style="display:none;background:${col}22;color:${col};border:1px solid ${col}">${esc(abbr(itemName(item)))}</span>
+        <span class="r-name">${esc(itemName(item))}${manualOnly ? ' <em class="muted" style="font-size:.75rem">(manuell)</em>' : ''}</span>
+        <span class="r-needed">${needed > 0 ? "benötigt: " + fmt(needed) + unit(item) : "—"}</span>
         <input type="number" min="0" step="any" placeholder="∞"
           value="${avail !== undefined ? avail : ""}"
           data-item="${esc(item)}">
+        <button class="btn-remove r-remove" data-item="${esc(item)}" title="Entfernen">✕</button>
       </div>`;
     }
     html += "</div>";
@@ -337,31 +342,63 @@
         saveState();
       });
     });
+    elResInputs.querySelectorAll(".r-remove").forEach(btn => {
+      btn.addEventListener("click", () => {
+        delete state.resources[btn.dataset.item];
+        saveState();
+        if (lastResult) renderResourceInputs(lastResult);
+      });
+    });
+  }
+
+  // Add-resource form
+  function showAddResourceForm() {
+    const existing = document.getElementById("add-res-form");
+    if (existing) { existing.remove(); return; }
+
+    const form = document.createElement("div");
+    form.id = "add-res-form";
+    form.className = "add-res-form";
+    form.innerHTML =
+      `<select id="add-res-item" style="min-width:200px">
+        <option value="">— Item wählen —</option>
+        ${allItems.map(c => `<option value="${c}">${esc(itemName(c))}</option>`).join("")}
+      </select>
+      <input type="number" id="add-res-amt" min="0" step="any" placeholder="Menge/min" style="width:110px">
+      <button id="confirm-add-res" class="btn btn-sm">Hinzufügen</button>
+      <button id="cancel-add-res" class="btn btn-sm btn-alt">✕</button>`;
+    elBtnAddRes.insertAdjacentElement("afterend", form);
+
+    document.getElementById("confirm-add-res").addEventListener("click", () => {
+      const item = document.getElementById("add-res-item").value;
+      const amt  = parseFloat(document.getElementById("add-res-amt").value);
+      if (!item) return;
+      state.resources[item] = isNaN(amt) || amt < 0 ? undefined : amt;
+      if (state.resources[item] === undefined) delete state.resources[item];
+      else saveState();
+      form.remove();
+      if (lastResult) renderResourceInputs(lastResult);
+    });
+    document.getElementById("cancel-add-res").addEventListener("click", () => form.remove());
   }
 
   function calculateMax(result) {
     elResResult.innerHTML = "";
-    const entries = [...result.raws.entries()];
-    const limited = entries
+    const limited = [...result.raws.entries()]
       .filter(([item]) => state.resources[item] !== undefined)
       .map(([item, needed]) => ({
-        item, needed,
-        avail: state.resources[item],
+        item, needed, avail: state.resources[item],
         mult: needed > 0 ? state.resources[item] / needed : Infinity,
       }));
 
+    // Also check manually-added resources not in plan (they're unlimited sources, ignored)
     if (!limited.length) {
-      elResResult.innerHTML = '<p class="muted">Gib zuerst verfügbare Rohstoffmengen ein.</p>';
+      elResResult.innerHTML = '<p class="muted">Gib verfügbare Mengen bei Rohstoffen ein, dann berechnen.</p>';
       return;
     }
-
     limited.sort((a, b) => a.mult - b.mult);
     const maxMult = limited[0].mult;
     const bottleneck = limited[0];
-
-    // Target rates at max
-    const maxTargets = state.targets.map(t => ({ ...t, rate: t.rate * maxMult }));
-    const maxRes = solve(maxTargets);
 
     let html = `<div class="result-box">
       <div>Maximaler Multiplikator: <span class="r-mult">${fmt(maxMult, 3)}×</span></div>
@@ -376,100 +413,224 @@
     }
     html += `</div>
       <button id="btn-apply-max" class="btn btn-sm" style="margin-top:10px">Diese Werte als Ziele übernehmen</button>
-      <div class="result-all-mult" style="margin-top:10px"><strong>Alle Rohstoffe:</strong>`;
+      <div class="result-all-mult" style="margin-top:10px"><strong>Alle eingetragenen Rohstoffe:</strong>`;
     const barMax = Math.max(...limited.map(l => l.mult), 1);
     for (const l of limited) {
-      const pct = Math.min(100, (l.mult / barMax) * 100);
-      const isBot = l === bottleneck;
-      html += `<div class="mult-row${isBot ? " bottleneck" : ""}">
-        <div class="m-bar" style="width:${pct.toFixed(0)}px"></div>
-        <span>${esc(itemName(l.item))}: ${fmt(l.avail)}/${fmt(l.needed)} = ${fmt(l.mult, 2)}×</span>
+      const pct = Math.min(100, (l.mult / barMax) * 100).toFixed(0);
+      html += `<div class="mult-row${l === bottleneck ? " bottleneck" : ""}">
+        <div class="m-bar" style="width:${pct}px"></div>
+        <span>${esc(itemName(l.item))}: ${fmt(l.avail)} ÷ ${fmt(l.needed)} = ${fmt(l.mult, 2)}×</span>
       </div>`;
     }
     html += "</div></div>";
     elResResult.innerHTML = html;
 
     document.getElementById("btn-apply-max").addEventListener("click", () => {
-      state.targets.forEach(t => { t.rate = t.rate * maxMult; });
-      renderTargets();
-      update();
+      state.targets.forEach(t => { t.rate = parseFloat(fmt(t.rate * maxMult, 4).replace(",", ".")) || t.rate * maxMult; });
+      renderTargets(); fcCustomPos = {}; update();
     });
   }
 
+  elBtnAddRes.addEventListener("click", showAddResourceForm);
   elBtnCalc.addEventListener("click", () => { if (lastResult) calculateMax(lastResult); });
-  elBtnClear.addEventListener("click", () => { state.resources = {}; elResResult.innerHTML = ""; if (lastResult) renderResourceInputs(lastResult); });
+  elBtnClear.addEventListener("click", () => {
+    state.resources = {}; elResResult.innerHTML = "";
+    if (lastResult) renderResourceInputs(lastResult);
+    saveState();
+  });
 
-  // ── Flowchart (SVG mindmap) ────────────────────────────────────────────────
+  // ── Flowchart ──────────────────────────────────────────────────────────────
   const NODE = { IW: 162, IH: 48, MW: 196, MH: 80, colGap: 52, rowGap: 18 };
 
-  // Pan/zoom
+  // Pan/zoom transform
   let fc = { tx: 20, ty: 20, scale: 1, drag: false, ox: 0, oy: 0 };
+  // Custom node positions set by dragging
+  let fcCustomPos = {};
+  // Current graph + layout (for edge redraws on drag)
+  let fcGraph     = null;
+  let fcLayoutPos = {};  // nodeId → {x, y} from auto-layout
+
   function fcApply() {
     const g = document.getElementById("fc-vp");
     if (g) g.setAttribute("transform", `translate(${fc.tx},${fc.ty}) scale(${fc.scale})`);
   }
+
   function fcFit(bounds) {
     const cW = elFlowWrap.clientWidth  || 900;
     const cH = elFlowWrap.clientHeight || 620;
     const pad = 28;
     const scaleW = (cW - pad * 2) / Math.max(bounds.w, 1);
     const scaleH = (cH - pad * 2) / Math.max(bounds.h, 1);
-    // Aim for at least 0.45 so nodes are readable; don't exceed 1.5
     fc.scale = Math.max(0.45, Math.min(scaleW, scaleH, 1.5));
     const rendW = bounds.w * fc.scale;
     const rendH = bounds.h * fc.scale;
-    // Horizontal: center if it fits, else align to left edge
     fc.tx = rendW < cW - pad * 2
       ? pad + (cW - pad * 2 - rendW) / 2 - bounds.minX * fc.scale
       : pad - bounds.minX * fc.scale;
-    // Vertical: center
     fc.ty = pad + Math.max(0, (cH - pad * 2 - rendH) / 2) - bounds.minY * fc.scale;
   }
 
+  // Convert screen coords to SVG-viewport coords (accounting for pan/zoom)
+  function screenToSvg(clientX, clientY) {
+    const r = elFlowWrap.getBoundingClientRect();
+    return {
+      x: (clientX - r.left - fc.tx) / fc.scale,
+      y: (clientY - r.top  - fc.ty) / fc.scale,
+    };
+  }
+
+  // Get effective position of a node (custom if dragged, else auto-layout)
+  function nodePos(id) {
+    return fcCustomPos[id] || fcLayoutPos[id] || { x: 0, y: 0 };
+  }
+
+  // Recalculate and update SVG path for one edge
+  function refreshEdge(edge) {
+    if (!fcGraph) return;
+    const fp = nodePos(edge.from);
+    const tp = nodePos(edge.to);
+    const fn = fcGraph.nodes.get(edge.from);
+    const tn = fcGraph.nodes.get(edge.to);
+    if (!fp || !tp || !fn || !tn) return;
+    const sw = fn.kind === "machine" ? NODE.MW : NODE.IW;
+    const sh = fn.kind === "machine" ? NODE.MH : NODE.IH;
+    const th = tn.kind === "machine" ? NODE.MH : NODE.IH;
+    const sx = fp.x + sw, sy = fp.y + sh / 2;
+    const tx = tp.x,     ty = tp.y + th / 2;
+    const dx = (tx - sx) * 0.45;
+    const eid = sid(edge.from) + "__" + sid(edge.to);
+    const pathEl = document.getElementById("ep_" + eid);
+    if (pathEl) pathEl.setAttribute("d", `M${sx},${sy} C${sx+dx},${sy} ${tx-dx},${ty} ${tx},${ty}`);
+    const lblEl = document.getElementById("el_" + eid);
+    if (lblEl) {
+      lblEl.setAttribute("x", (sx + tx) / 2);
+      lblEl.setAttribute("y", (sy + ty) / 2 - 5);
+    }
+  }
+
+  // ── Interaction (pan + node drag) ──────────────────────────────────────────
+  let dragNodeId   = null;
+  let dragSvgStart = null;
+  let dragNodeStart= null;
+
   function initFcInteraction() {
+    // Wheel zoom
     elFlowWrap.addEventListener("wheel", e => {
       e.preventDefault();
       const f = e.deltaY < 0 ? 1.12 : 1 / 1.12;
       fc.scale = Math.max(0.1, Math.min(5, fc.scale * f));
       fcApply();
     }, { passive: false });
+
+    // Mouse down
     elFlowWrap.addEventListener("mousedown", e => {
       if (e.button !== 0) return;
-      fc.drag = true; fc.ox = e.clientX - fc.tx; fc.oy = e.clientY - fc.ty;
+      const nodeEl = e.target.closest("[data-nodeid]");
+      if (nodeEl) {
+        // Start node drag
+        dragNodeId    = nodeEl.dataset.nodeid;
+        dragSvgStart  = screenToSvg(e.clientX, e.clientY);
+        const p       = nodePos(dragNodeId);
+        dragNodeStart = { x: p.x, y: p.y };
+        e.stopPropagation();
+      } else {
+        // Start pan
+        fc.drag = true;
+        fc.ox   = e.clientX - fc.tx;
+        fc.oy   = e.clientY - fc.ty;
+      }
     });
+
     window.addEventListener("mousemove", e => {
-      if (!fc.drag) return;
-      fc.tx = e.clientX - fc.ox; fc.ty = e.clientY - fc.oy; fcApply();
+      if (dragNodeId) {
+        const cur = screenToSvg(e.clientX, e.clientY);
+        const newX = dragNodeStart.x + (cur.x - dragSvgStart.x);
+        const newY = dragNodeStart.y + (cur.y - dragSvgStart.y);
+        fcCustomPos[dragNodeId] = { x: newX, y: newY };
+        // Move node element
+        const nodeEl = document.querySelector(`[data-nodeid="${CSS.escape(dragNodeId)}"]`);
+        if (nodeEl) nodeEl.setAttribute("transform", `translate(${newX},${newY})`);
+        // Redraw connected edges
+        if (fcGraph) {
+          for (const edge of fcGraph.edges) {
+            if (edge.from === dragNodeId || edge.to === dragNodeId) refreshEdge(edge);
+          }
+        }
+      } else if (fc.drag) {
+        fc.tx = e.clientX - fc.ox;
+        fc.ty = e.clientY - fc.oy;
+        fcApply();
+      }
     });
-    window.addEventListener("mouseup", () => { fc.drag = false; });
-    // Touch
-    let pinchD = 0;
+
+    window.addEventListener("mouseup", () => {
+      dragNodeId = null; dragSvgStart = null; dragNodeStart = null;
+      fc.drag    = false;
+    });
+
+    // Touch support
+    let touchNodeId = null, touchSvgStart = null, touchNodeStart = null;
+    let pinchDist = 0;
+
     elFlowWrap.addEventListener("touchstart", e => {
-      if (e.touches.length === 1) { fc.drag = true; fc.ox = e.touches[0].clientX - fc.tx; fc.oy = e.touches[0].clientY - fc.ty; }
-      else if (e.touches.length === 2) { fc.drag = false; pinchD = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); }
-    }, { passive: true });
-    elFlowWrap.addEventListener("touchmove", e => {
-      if (e.touches.length === 1 && fc.drag) { fc.tx = e.touches[0].clientX - fc.ox; fc.ty = e.touches[0].clientY - fc.oy; fcApply(); }
-      else if (e.touches.length === 2) {
-        const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-        fc.scale = Math.max(0.1, Math.min(5, fc.scale * (d / pinchD))); pinchD = d; fcApply();
+      if (e.touches.length === 1) {
+        const touch   = e.touches[0];
+        const nodeEl  = document.elementFromPoint(touch.clientX, touch.clientY)?.closest("[data-nodeid]");
+        if (nodeEl) {
+          touchNodeId    = nodeEl.dataset.nodeid;
+          touchSvgStart  = screenToSvg(touch.clientX, touch.clientY);
+          const p        = nodePos(touchNodeId);
+          touchNodeStart = { x: p.x, y: p.y };
+        } else {
+          fc.drag = true;
+          fc.ox   = touch.clientX - fc.tx;
+          fc.oy   = touch.clientY - fc.ty;
+        }
+      } else if (e.touches.length === 2) {
+        fc.drag = false; touchNodeId = null;
+        pinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
       }
     }, { passive: true });
-    elFlowWrap.addEventListener("touchend", () => { fc.drag = false; });
+
+    elFlowWrap.addEventListener("touchmove", e => {
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        if (touchNodeId) {
+          const cur = screenToSvg(touch.clientX, touch.clientY);
+          const newX = touchNodeStart.x + (cur.x - touchSvgStart.x);
+          const newY = touchNodeStart.y + (cur.y - touchSvgStart.y);
+          fcCustomPos[touchNodeId] = { x: newX, y: newY };
+          const nodeEl = document.querySelector(`[data-nodeid="${CSS.escape(touchNodeId)}"]`);
+          if (nodeEl) nodeEl.setAttribute("transform", `translate(${newX},${newY})`);
+          if (fcGraph) for (const edge of fcGraph.edges)
+            if (edge.from === touchNodeId || edge.to === touchNodeId) refreshEdge(edge);
+        } else if (fc.drag) {
+          fc.tx = touch.clientX - fc.ox;
+          fc.ty = touch.clientY - fc.oy;
+          fcApply();
+        }
+      } else if (e.touches.length === 2) {
+        const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        fc.scale = Math.max(0.1, Math.min(5, fc.scale * (d / pinchDist)));
+        pinchDist = d; fcApply();
+      }
+    }, { passive: true });
+
+    elFlowWrap.addEventListener("touchend", () => {
+      touchNodeId = null; fc.drag = false;
+    });
   }
 
-  elFlowFit.addEventListener("click", () => {
+  elFlowFit.addEventListener("click", () => { if (lastResult) renderFlowchart(lastResult, true); });
+  elFlowReset.addEventListener("click", () => {
+    fcCustomPos = {};
+    fc = { tx: 20, ty: 20, scale: 1, drag: false, ox: 0, oy: 0 };
     if (lastResult) renderFlowchart(lastResult, true);
   });
-  elFlowReset.addEventListener("click", () => {
-    fc = { tx: 20, ty: 20, scale: 1, drag: false, ox: 0, oy: 0 };
-    if (lastResult) renderFlowchart(lastResult, false);
-    else fcApply();
-  });
 
-  // Build graph from solver result
+  // ── Graph builder ──────────────────────────────────────────────────────────
   function buildGraph(result) {
-    const nodes = new Map();   // id → node
+    const nodes = new Map();
     const edges = [];
 
     function ensureItem(item) {
@@ -480,20 +641,12 @@
     }
 
     for (const [rid, st] of result.steps) {
-      const r  = st.recipe;
-      const b  = BUILDINGS[r.bld];
-      const cf = clockFor(r.id);
+      const r = st.recipe, b = BUILDINGS[r.bld], cf = clockFor(r.id);
       const ck = state.stepClocks[r.id] !== undefined ? state.stepClocks[r.id] : state.globalClock;
       const base = r.pow != null ? r.pow : (b ? b.power : 0);
       const pw = st.machines * base * Math.pow(cf, b ? b.exp : 1.321929);
       const mid = "M:" + rid;
-
-      nodes.set(mid, {
-        id: mid, kind: "machine",
-        bld: b ? b.name : "?",
-        rec: r.name.replace(/^Alternate:\s*/, ""),
-        machines: st.machines, clock: ck, power: pw,
-      });
+      nodes.set(mid, { id: mid, kind: "machine", bld: b ? b.name : "?", rec: r.name.replace(/^Alternate:\s*/, ""), machines: st.machines, clock: ck, power: pw });
 
       for (const [item, amt] of r.in) {
         const rate = (amt * 60 / r.time) * cf * st.machines * state.costMult;
@@ -515,12 +668,10 @@
     return { nodes, edges };
   }
 
-  // Layered layout: raw items=rank 0, propagate through edges
+  // ── Layout ─────────────────────────────────────────────────────────────────
   function layout(nodes, edges) {
     const rank = new Map();
-    for (const [id, n] of nodes)
-      if (n.kind === "item" && n.raw) rank.set(id, 0);
-
+    for (const [id, n] of nodes) if (n.kind === "item" && n.raw) rank.set(id, 0);
     let changed = true;
     for (let i = 0; changed && i < 600; i++) {
       changed = false;
@@ -533,14 +684,12 @@
     }
     for (const [id] of nodes) if (!rank.has(id)) rank.set(id, 0);
 
-    // Group by rank
     const layers = new Map();
     for (const [id] of nodes) {
       const r = rank.get(id);
       (layers.has(r) ? layers.get(r) : layers.set(r, []).get(r)).push(id);
     }
 
-    // Column x positions (items narrower, machines wider)
     const maxRank = Math.max(...rank.values(), 0);
     const colX = [];
     let x = 0;
@@ -550,23 +699,17 @@
       x += (isMach ? NODE.MW : NODE.IW) + NODE.colGap;
     }
 
-    // Initial y positions
     const pos = new Map();
     for (const [r, ids] of layers)
       ids.forEach((id, i) => pos.set(id, { x: colX[r], y: i * (NODE.IH + NODE.rowGap) + 10 }));
 
-    // 4 passes of barycenter ordering + enforce minimum spacing
     for (let pass = 0; pass < 4; pass++) {
       for (const [r, ids] of layers) {
         const scored = ids.map(id => {
-          const nbr = edges
-            .filter(e => e.from === id || e.to === id)
-            .map(e => e.from === id ? e.to : e.from)
-            .map(nid => (pos.get(nid) || { y: 0 }).y);
-          const avg = nbr.length ? nbr.reduce((a, b) => a + b, 0) / nbr.length : (pos.get(id) || { y: 0 }).y;
-          return { id, avg };
+          const nbr = edges.filter(e => e.from === id || e.to === id).map(e => e.from === id ? e.to : e.from);
+          const ys  = nbr.map(nid => (pos.get(nid) || { y: 0 }).y);
+          return { id, avg: ys.length ? ys.reduce((a, b) => a + b, 0) / ys.length : (pos.get(id) || { y: 0 }).y };
         }).sort((a, b) => a.avg - b.avg);
-
         let curY = 10;
         for (const { id } of scored) {
           const h = nodes.get(id).kind === "machine" ? NODE.MH : NODE.IH;
@@ -576,11 +719,9 @@
       }
     }
 
-    // Compute content bounds
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const [id, n] of nodes) {
-      const p = pos.get(id);
-      if (!p) continue;
+      const p = pos.get(id); if (!p) continue;
       const w = n.kind === "machine" ? NODE.MW : NODE.IW;
       const h = n.kind === "machine" ? NODE.MH : NODE.IH;
       minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
@@ -589,20 +730,24 @@
     return { pos, bounds: { minX: minX || 0, minY: minY || 0, w: (maxX - minX) || 100, h: (maxY - minY) || 100 } };
   }
 
-  // Render SVG
+  // ── Flowchart renderer ─────────────────────────────────────────────────────
   function renderFlowchart(result, fit) {
     if (!result || !result.steps.size) {
-      elFlow.innerHTML = `<text x="20" y="40" fill="#9aa3b2" font-size="14" font-family="Segoe UI,sans-serif">Füge Produktionsziele hinzu, um den Fluss zu sehen.</text>`;
+      elFlow.innerHTML = `<text x="20" y="40" fill="#9aa3b2" font-size="14" font-family="Segoe UI,sans-serif">Füge Produktionsziele hinzu.</text>`;
       return;
     }
 
-    const { nodes, edges } = buildGraph(result);
-    const { pos, bounds }  = layout(nodes, edges);
+    fcGraph = buildGraph(result);
+    const { pos, bounds } = layout(fcGraph.nodes, fcGraph.edges);
+
+    // Store auto-layout positions; custom positions override on read
+    fcLayoutPos = {};
+    for (const [id, p] of pos) fcLayoutPos[id] = { ...p };
 
     if (fit) fcFit(bounds);
 
     const cW = elFlowWrap.clientWidth  || 900;
-    const cH = elFlowWrap.clientHeight || 560;
+    const cH = elFlowWrap.clientHeight || 620;
     elFlow.setAttribute("viewBox", `0 0 ${cW} ${cH}`);
     elFlow.setAttribute("width",  cW);
     elFlow.setAttribute("height", cH);
@@ -616,96 +761,93 @@
       </marker>
     </defs>`;
 
-    // ── Edges ──
+    // ── Edges (rendered below nodes) ──
     let edgeSvg = "";
-    for (const e of edges) {
-      const sp = pos.get(e.from), tp = pos.get(e.to);
-      if (!sp || !tp) continue;
-      const sn = nodes.get(e.from), tn = nodes.get(e.to);
-      const sw = sn.kind === "machine" ? NODE.MW : NODE.IW;
-      const sh = sn.kind === "machine" ? NODE.MH : NODE.IH;
+    for (const e of fcGraph.edges) {
+      const fp = nodePos(e.from), tp = nodePos(e.to);
+      if (!fp || !tp) continue;
+      const fn = fcGraph.nodes.get(e.from), tn = fcGraph.nodes.get(e.to);
+      const sw = fn.kind === "machine" ? NODE.MW : NODE.IW;
+      const sh = fn.kind === "machine" ? NODE.MH : NODE.IH;
       const th = tn.kind === "machine" ? NODE.MH : NODE.IH;
-      const sx = sp.x + sw, sy = sp.y + sh / 2;
+      const sx = fp.x + sw, sy = fp.y + sh / 2;
       const tx = tp.x,     ty = tp.y + th / 2;
       const dx = (tx - sx) * 0.45;
       const stroke = e.liq ? "#56cfe1" : "#4a5568";
       const marker = e.liq ? "url(#arr-liq)" : "url(#arr)";
+      const eid    = sid(e.from) + "__" + sid(e.to);
       const mx = (sx + tx) / 2, my = (sy + ty) / 2;
       edgeSvg += `
-        <path d="M${sx},${sy} C${sx+dx},${sy} ${tx-dx},${ty} ${tx},${ty}"
+        <path id="ep_${eid}" d="M${sx},${sy} C${sx+dx},${sy} ${tx-dx},${ty} ${tx},${ty}"
           fill="none" stroke="${stroke}" stroke-width="2" marker-end="${marker}" opacity="0.8"/>
-        <text x="${mx}" y="${my - 5}" text-anchor="middle" font-size="9.5"
-          fill="${stroke}" font-family="Segoe UI,sans-serif" opacity="0.95">
+        <text id="el_${eid}" x="${mx}" y="${my - 5}" text-anchor="middle"
+          font-size="9.5" fill="${stroke}" font-family="Segoe UI,sans-serif" opacity="0.9" pointer-events="none">
           ${fmt(e.rate)}${e.liq ? " m³" : ""}/min
         </text>`;
     }
 
-    // ── Nodes ──
+    // ── Nodes (rendered above edges, draggable) ──
     let nodeSvg = "";
-    for (const [id, n] of nodes) {
-      const p = pos.get(id);
-      if (!p) continue;
+    for (const [id, n] of fcGraph.nodes) {
+      const p = nodePos(id); if (!p) continue;
 
       if (n.kind === "machine") {
-        const { x, y } = p;
+        const { x, y } = { x: 0, y: 0 }; // use translate instead
         const W = NODE.MW, H = NODE.MH;
         nodeSvg += `
-          <rect x="${x}" y="${y}" width="${W}" height="${H}" rx="8"
-            fill="#2b303b" stroke="#fa9549" stroke-width="1.8"/>
-          <rect x="${x+1}" y="${y+1}" width="${W-2}" height="24" rx="7"
-            fill="#fa954930"/>
-          <rect x="${x+1}" y="${y+18}" width="${W-2}" height="8"
-            fill="#fa954318"/>
-          <text x="${x+W/2}" y="${y+17}" text-anchor="middle" dominant-baseline="middle"
-            font-size="12" font-weight="700" fill="#fa9549" font-family="Segoe UI,sans-serif">
-            ${esc(n.bld)}
-          </text>
-          <text x="${x+W/2}" y="${y+38}" text-anchor="middle" dominant-baseline="middle"
-            font-size="10" fill="#c5c9d4" font-family="Segoe UI,sans-serif">
-            ${esc(trunc(n.rec, 28))}
-          </text>
-          <text x="${x+W/2}" y="${y+56}" text-anchor="middle" dominant-baseline="middle"
-            font-size="11" fill="#6fcf7c" font-family="Segoe UI,sans-serif">
-            ${fmt(n.machines, 2)}× (${Math.ceil(n.machines - 1e-9)} Stk.)
-          </text>
-          <text x="${x+W/2}" y="${y+72}" text-anchor="middle" dominant-baseline="middle"
-            font-size="9.5" fill="#9aa3b2" font-family="Segoe UI,sans-serif">
-            Taktung ${n.clock} % · ${fmt(n.power, 1)} MW
-          </text>`;
+          <g data-nodeid="${esc(id)}" transform="translate(${p.x},${p.y})"
+            style="cursor:move" class="fc-node">
+            <rect x="0" y="0" width="${W}" height="${H}" rx="8"
+              fill="#2b303b" stroke="#fa9549" stroke-width="1.8"/>
+            <rect x="1" y="1" width="${W-2}" height="24" rx="7" fill="#fa954930"/>
+            <rect x="1" y="18" width="${W-2}" height="8"  fill="#fa954318"/>
+            <text x="${W/2}" y="17" text-anchor="middle" dominant-baseline="middle"
+              font-size="12" font-weight="700" fill="#fa9549" font-family="Segoe UI,sans-serif"
+              pointer-events="none">${esc(n.bld)}</text>
+            <text x="${W/2}" y="38" text-anchor="middle" dominant-baseline="middle"
+              font-size="10" fill="#c5c9d4" font-family="Segoe UI,sans-serif"
+              pointer-events="none">${esc(trunc(n.rec, 28))}</text>
+            <text x="${W/2}" y="56" text-anchor="middle" dominant-baseline="middle"
+              font-size="11" fill="#6fcf7c" font-family="Segoe UI,sans-serif"
+              pointer-events="none">${fmt(n.machines, 2)}× (${Math.ceil(n.machines - 1e-9)} Stk.)</text>
+            <text x="${W/2}" y="72" text-anchor="middle" dominant-baseline="middle"
+              font-size="9.5" fill="#9aa3b2" font-family="Segoe UI,sans-serif"
+              pointer-events="none">Taktung ${n.clock} % · ${fmt(n.power, 1)} MW</text>
+          </g>`;
       } else {
-        const { x, y } = p;
-        const W = NODE.IW, H = NODE.IH;
-        const col  = hexCol(n.item);
-        const ab   = abbr(n.label);
-        const r    = H / 2;
-        // Display rate: raw items show their outRate, products show inRate
+        const W = NODE.IW, H = NODE.IH, r = H / 2;
+        const col         = hexCol(n.item);
+        const ab          = abbr(n.label);
         const displayRate = n.raw ? n.outRate : n.inRate;
-        const rateStr = (displayRate > 0 ? fmt(displayRate) : "–") + (n.liq ? " m³" : "") + "/min";
-
+        const rateStr     = (displayRate > 0 ? fmt(displayRate) : "–") + (n.liq ? " m³" : "") + "/min";
         nodeSvg += `
-          <rect x="${x}" y="${y}" width="${W}" height="${H}" rx="${r}"
-            fill="${col}18" stroke="${col}" stroke-width="1.8"/>
-          <circle cx="${x+r}" cy="${y+r}" r="${r-5}"
-            fill="${col}30" stroke="${col}" stroke-width="1.2"/>
-          <text x="${x+r}" y="${y+r}" text-anchor="middle" dominant-baseline="middle"
-            font-size="11" font-weight="800" fill="${col}" font-family="Segoe UI,sans-serif">
-            ${esc(ab)}
-          </text>
-          <text x="${x+H+4}" y="${y+16}" dominant-baseline="middle"
-            font-size="10.5" font-weight="600" fill="${col}" font-family="Segoe UI,sans-serif">
-            ${esc(trunc(n.label, 17))}
-          </text>
-          <text x="${x+H+4}" y="${y+34}" dominant-baseline="middle"
-            font-size="9.5" fill="${col}bb" font-family="Segoe UI,sans-serif">
-            ${esc(rateStr)}
-          </text>
-          ${n.raw ? `<text x="${x+W-6}" y="${y+H/2}" text-anchor="end" dominant-baseline="middle"
-            font-size="8" fill="${col}88" font-family="Segoe UI,sans-serif">Rohstoff</text>` : ""}`;
+          <g data-nodeid="${esc(id)}" transform="translate(${p.x},${p.y})"
+            style="cursor:move" class="fc-node">
+            <rect x="0" y="0" width="${W}" height="${H}" rx="${r}"
+              fill="${col}18" stroke="${col}" stroke-width="1.8"/>
+            <circle cx="${r}" cy="${r}" r="${r-5}"
+              fill="${col}30" stroke="${col}" stroke-width="1.2"/>
+            <text x="${r}" y="${r}" text-anchor="middle" dominant-baseline="middle"
+              font-size="11" font-weight="800" fill="${col}" font-family="Segoe UI,sans-serif"
+              pointer-events="none">${esc(ab)}</text>
+            <text x="${H+4}" y="16" dominant-baseline="middle"
+              font-size="10.5" font-weight="600" fill="${col}" font-family="Segoe UI,sans-serif"
+              pointer-events="none">${esc(trunc(n.label, 17))}</text>
+            <text x="${H+4}" y="34" dominant-baseline="middle"
+              font-size="9.5" fill="${col}bb" font-family="Segoe UI,sans-serif"
+              pointer-events="none">${esc(rateStr)}</text>
+            ${n.raw ? `<text x="${W-6}" y="${H/2}" text-anchor="end" dominant-baseline="middle"
+              font-size="8" fill="${col}88" font-family="Segoe UI,sans-serif"
+              pointer-events="none">Rohstoff</text>` : ""}
+          </g>`;
       }
     }
 
     elFlow.innerHTML = defs +
-      `<g id="fc-vp" transform="translate(${fc.tx},${fc.ty}) scale(${fc.scale})">${edgeSvg}${nodeSvg}</g>`;
+      `<g id="fc-vp" transform="translate(${fc.tx},${fc.ty}) scale(${fc.scale})">
+        <g id="fc-edges">${edgeSvg}</g>
+        <g id="fc-nodes">${nodeSvg}</g>
+      </g>`;
   }
 
   // ── Main update ────────────────────────────────────────────────────────────
@@ -725,7 +867,7 @@
 
   initFcInteraction();
   renderTargets();
-  // First render with auto-fit so the graph is visible
+  // First render with auto-fit
   const firstResult = solve(state.targets);
   lastResult = firstResult;
   renderSummary(firstResult);

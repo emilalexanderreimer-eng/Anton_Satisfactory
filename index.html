@@ -60,6 +60,7 @@
     <p class="hint">Trage ein, wie viele Rohstoffe du pro Minute förderst (leer = unbegrenzt). Drücke dann <em>Maximum berechnen</em> um den Engpass zu finden.</p>
     <div id="resource-inputs"><p class="muted">Füge zuerst ein Produktionsziel hinzu.</p></div>
     <div class="resources-actions">
+      <button id="btn-add-resource" class="btn btn-sm">+ Ressource hinzufügen</button>
       <button id="btn-calc-max" class="btn">Maximum berechnen</button>
       <button id="btn-clear-res" class="btn btn-alt btn-sm">Alles leeren</button>
     </div>
@@ -91,7 +92,7 @@
         <button id="flow-reset" class="btn btn-sm btn-alt">⟳ Reset</button>
       </div>
     </div>
-    <p class="hint">Scrollen zum Zoomen · Ziehen zum Verschieben</p>
+    <p class="hint">Scrollen zum Zoomen · Hintergrund ziehen zum Verschieben · <strong>Knoten einzeln verschieben</strong> · ⟳ Reset setzt Layout zurück</p>
     <div id="flowchart-wrap">
       <svg id="flowchart"></svg>
     </div>
