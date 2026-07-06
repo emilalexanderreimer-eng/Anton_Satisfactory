@@ -15,13 +15,38 @@
 <main>
   <section class="panel" id="settings-panel">
     <h2>Einstellungen</h2>
-    <div class="settings-row">
-      <label class="mod-label">Globale Taktung:</label>
-      <input type="number" id="clock-global" min="1" max="250" step="1" value="100"> %
-      <button id="apply-all" class="btn btn-sm">Auf alle anwenden</button>
-      <button id="apply-025" class="btn btn-sm btn-alt">0,25 auf alle (25 %)</button>
+
+    <div class="settings-block">
+      <div class="settings-label">Globale Taktung (Overclock)</div>
+      <div class="settings-row">
+        <input type="number" id="clock-global" min="1" max="250" step="1" value="100"> %
+        <button id="apply-all" class="btn btn-sm">Auf alle anwenden</button>
+      </div>
+      <p class="hint">Tipp: Taktung pro Maschine direkt in der Ergebnistabelle einstellen.</p>
     </div>
-    <p class="hint">Tipp: Setze pro Maschine eine eigene Taktung direkt in der Ergebnistabelle.</p>
+
+    <div class="settings-block" style="margin-top:14px">
+      <div class="settings-label">
+        Rezeptkosten-Multiplikator
+        <span class="badge-new">Update 1.2 Game Mode</span>
+      </div>
+      <div class="settings-row">
+        <select id="cost-mult">
+          <option value="0.25">0,25× — Zutaten auf 25 %</option>
+          <option value="0.5">0,50× — Zutaten auf 50 %</option>
+          <option value="0.75">0,75× — Zutaten auf 75 %</option>
+          <option value="1" selected>1,00× — Standard</option>
+          <option value="1.25">1,25× — Zutaten auf 125 %</option>
+          <option value="1.5">1,50× — Zutaten auf 150 %</option>
+          <option value="1.75">1,75× — Zutaten auf 175 %</option>
+          <option value="2">2,00× — Zutaten auf 200 %</option>
+        </select>
+      </div>
+      <p class="hint">
+        Multipliziert nur die <strong>Zutatenmengen</strong> jedes Rezepts — Ausgabe und Maschinenanzahl bleiben gleich.<br>
+        Beispiel mit 0,25×: Smelter benötigt statt 30 Erz/min nur 7,5 Erz/min, produziert aber weiterhin 30 Ingots/min.
+      </p>
+    </div>
   </section>
 
   <section class="panel" id="targets-panel">

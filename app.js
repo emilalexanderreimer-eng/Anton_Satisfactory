@@ -25,10 +25,12 @@
     recipeChoice:{},
     stepClocks:  {},
     globalClock: 100,
+    costMult:    1,
     resources:   {},
   };
   if (!state.stepClocks)  state.stepClocks  = {};
   if (!state.globalClock) state.globalClock = state.clock || 100;
+  if (!state.costMult)    state.costMult    = 1;
   if (!state.resources)   state.resources   = {};
 
   function saveState() {
@@ -135,7 +137,8 @@
         surplus.set(oItem, (surplus.get(oItem) || 0) + (oAmt * 60 / rec.time) * cf * mach);
       }
       for (const [iItem, iAmt] of rec.in)
-        addDemand(iItem, (iAmt * 60 / rec.time) * cf * mach);
+        // costMult scales ingredient amounts only — output and machine count are unaffected
+        addDemand(iItem, (iAmt * 60 / rec.time) * cf * mach * state.costMult);
     }
 
     let power = 0;
@@ -153,6 +156,7 @@
   const elGlobalCk  = document.getElementById("clock-global");
   const elApplyAll  = document.getElementById("apply-all");
   const elApply025  = document.getElementById("apply-025");
+  const elCostMult  = document.getElementById("cost-mult");
   const elResInputs = document.getElementById("resource-inputs");
   const elBtnCalc   = document.getElementById("btn-calc-max");
   const elBtnClear  = document.getElementById("btn-clear-res");
@@ -199,8 +203,12 @@
     const v = parseFloat(elGlobalCk.value);
     if (v >= 1 && v <= 250) { state.stepClocks = {}; state.globalClock = v; update(); }
   });
-  elApply025.addEventListener("click", () => {
-    state.stepClocks = {}; state.globalClock = 25; elGlobalCk.value = 25; update();
+
+  // Cost multiplier (Update 1.2 Game Mode)
+  elCostMult.value = String(state.costMult);
+  elCostMult.addEventListener("change", () => {
+    state.costMult = parseFloat(elCostMult.value) || 1;
+    update();
   });
 
   // ── Ingredient pills ───────────────────────────────────────────────────────
@@ -208,7 +216,7 @@
     if (!rec.in.length) return "";
     const cf = clockFor(rec.id);
     const pills = rec.in.map(([item, amt]) => {
-      const rate = (amt * 60 / rec.time) * cf * machines;
+      const rate = (amt * 60 / rec.time) * cf * machines * state.costMult;
       const lq   = isLiq(item);
       const col  = hexCol(item);
       return `<span class="ingr-pill">
@@ -283,11 +291,15 @@
   // ── Summary ────────────────────────────────────────────────────────────────
   function renderSummary(result) {
     const machines = [...result.steps.values()].reduce((a, s) => a + Math.ceil(s.machines - 1e-9), 0);
+    const multLabel = state.costMult !== 1
+      ? `<div class="card"><div class="label">Rezeptkosten-Mult.</div><div class="value" style="color:var(--warn)">${fmt(state.costMult, 2)}×</div></div>`
+      : "";
     elSummary.innerHTML =
       `<div class="summary-cards">
         <div class="card"><div class="label">Maschinen gesamt</div><div class="value">${machines}</div></div>
         <div class="card"><div class="label">Leistung gesamt</div><div class="value">${fmt(result.power, 1)} MW</div></div>
         <div class="card"><div class="label">Produktionsschritte</div><div class="value">${result.steps.size}</div></div>
+        ${multLabel}
       </div>` +
       (result.unstable ? '<p class="warn">⚠ Möglicher Rezeptzyklus erkannt.</p>' : "");
   }
@@ -484,7 +496,7 @@
       });
 
       for (const [item, amt] of r.in) {
-        const rate = (amt * 60 / r.time) * cf * st.machines;
+        const rate = (amt * 60 / r.time) * cf * st.machines * state.costMult;
         const iid  = ensureItem(item);
         nodes.get(iid).outRate += rate;
         edges.push({ from: iid, to: mid, rate, liq: isLiq(item) });
