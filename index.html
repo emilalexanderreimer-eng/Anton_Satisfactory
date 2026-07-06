@@ -19,9 +19,9 @@
       <label class="mod-label">Globale Taktung:</label>
       <input type="number" id="clock-global" min="1" max="250" step="1" value="100"> %
       <button id="apply-all" class="btn btn-sm">Auf alle anwenden</button>
-      <button id="apply-025" class="btn btn-sm btn-alt">0,25 auf alle (25&nbsp;%)</button>
+      <button id="apply-025" class="btn btn-sm btn-alt">0,25 auf alle (25 %)</button>
     </div>
-    <p class="hint">Tipp: Setze pro Maschine eine eigene Taktung in der Ergebnistabelle unten.</p>
+    <p class="hint">Tipp: Setze pro Maschine eine eigene Taktung direkt in der Ergebnistabelle.</p>
   </section>
 
   <section class="panel" id="targets-panel">
@@ -30,13 +30,22 @@
     <button id="add-target" class="btn">+ Ziel hinzufügen</button>
   </section>
 
+  <section class="panel" id="resources-panel">
+    <h2>Verfügbare Rohstoffe</h2>
+    <p class="hint">Trage ein, wie viele Rohstoffe du pro Minute förderst (leer = unbegrenzt). Drücke dann <em>Maximum berechnen</em> um den Engpass zu finden.</p>
+    <div id="resource-inputs"><p class="muted">Füge zuerst ein Produktionsziel hinzu.</p></div>
+    <div class="resources-actions">
+      <button id="btn-calc-max" class="btn">Maximum berechnen</button>
+      <button id="btn-clear-res" class="btn btn-alt btn-sm">Alles leeren</button>
+    </div>
+    <div id="resource-result"></div>
+  </section>
+
   <section class="panel" id="results-panel">
     <h2>Ergebnis</h2>
     <div id="summary"></div>
-
     <h3>Produktionsschritte</h3>
     <div class="table-wrap" id="steps"></div>
-
     <div class="two-col">
       <div>
         <h3>Rohstoffe</h3>
@@ -52,8 +61,12 @@
   <section class="panel" id="flow-panel">
     <div class="flow-header">
       <h2>Produktionsfluss</h2>
-      <button id="flow-reset" class="btn btn-sm">⟳ Reset Ansicht</button>
+      <div class="flow-controls">
+        <button id="flow-fit" class="btn btn-sm">⤢ Einpassen</button>
+        <button id="flow-reset" class="btn btn-sm btn-alt">⟳ Reset</button>
+      </div>
     </div>
+    <p class="hint">Scrollen zum Zoomen · Ziehen zum Verschieben</p>
     <div id="flowchart-wrap">
       <svg id="flowchart"></svg>
     </div>
