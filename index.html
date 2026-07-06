@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anton Satisfactory Planner</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>🏭 Anton Satisfactory Planner</h1>
+  <p class="subtitle">Produktionsplaner für Satisfactory (Update 1.2)</p>
+</header>
+
+<main>
+  <section class="panel" id="settings-panel">
+    <h2>Einstellungen</h2>
+    <label class="modifier-toggle">
+      <input type="checkbox" id="modifier-025">
+      <span><strong>0,25-Modifikator</strong> — alle Rezepte laufen mit 25&nbsp;% Taktung (Update 1.2)</span>
+    </label>
+    <div class="modifier-custom">
+      <label for="clock-input">Taktung aller Maschinen:</label>
+      <input type="number" id="clock-input" min="1" max="250" step="1" value="100"> %
+    </div>
+  </section>
+
+  <section class="panel" id="targets-panel">
+    <h2>Produktionsziele</h2>
+    <div id="targets"></div>
+    <button id="add-target" class="btn">+ Ziel hinzufügen</button>
+  </section>
+
+  <section class="panel" id="results-panel">
+    <h2>Ergebnis</h2>
+    <div id="summary"></div>
+    <h3>Produktionsschritte</h3>
+    <div id="steps"></div>
+    <h3>Rohstoffe</h3>
+    <div id="raws"></div>
+    <h3>Nebenprodukte</h3>
+    <div id="byproducts"></div>
+    <h3>Produktionsbaum</h3>
+    <div id="tree"></div>
+  </section>
+</main>
+
+<footer>
+  <p>Daten: Community-Datensatz (SatisfactoryTools) · Kein offizielles Produkt von Coffee Stain Studios</p>
+</footer>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
